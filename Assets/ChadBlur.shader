@@ -1,9 +1,9 @@
-Shader "Unlit/ChadBlur"
+Shader "Examples/ChadBlur"
 {
     Properties
     {
         _MainTex ("Texture", 2D) = "white" {}
-        _KernelSize ("kernel size", Range(1,100)) = 1
+       _KernelSize ("kernel size", Range(1,100)) = 1
     }
     SubShader
     {
@@ -37,10 +37,17 @@ Shader "Unlit/ChadBlur"
             float2 _MainTex_TexelSize;
             uint _KernelSize = 3;
             float3x3 _filter = {
-                             1/16,1/8,1/16,
-                1/8,1/4,1/8,
-                1/16,1/8,1/16
+                             0,0,0,
+                0,1 ,0,
+                0,0,0
                 };
+
+            static const float SobelFilterKernelH[9] =
+            {
+                -1, 0, 1,
+                -2, 0, 2,
+                -1, 0, 1
+            };
             float gaussian(int x , float sigma){
                 float twoSigmaSqr = 2*sigma*sigma;
                 return (1/sqrt(PI * twoSigmaSqr)) * pow(E, -(x*x)/(2*twoSigmaSqr));
@@ -73,33 +80,43 @@ Shader "Unlit/ChadBlur"
 
 
                 
-            return float4(col,1.0f);
+            return float4(col.xxx,1.0f);
             }
 
+           
             float4 fragGeneralFilter(v2f i ): SV_Target {
                 
                 float3  col = float3(0.0f , 0.0f, 0.0f);
-                float kernelSum = 0.0f;
-                int upper = ((_KernelSize -1 )/2);
-                float sigma = _KernelSize / 8.0f;
-                int lower = -upper;
-                for(int x= lower; x<= upper;++x){
 
-                    for(int y = lower; y<=upper; ++y)
+                int count = 0 ;
+                for(int x= -1; x<= 1;x++){
+
+                    for(int y = -1; y<=1; y++)
                     {
-                        float gauss = _filter[x+1,y+1];
-                        kernelSum += gauss;
-                    
-                        float2 uv = i.uv + float2(_MainTex_TexelSize.x *x,_MainTex_TexelSize.y *y );
-                        col += max(0, gauss*Luminance(tex2D(_MainTex,uv).xyz));
+                        //float filter = _filter[x+1,y+1];
+                       
+                        float filter = SobelFilterKernelH[count];
+                        float2 uv = float2(i.uv.x+ _MainTex_TexelSize.x*x ,i.uv.y + _MainTex_TexelSize.y*y);
+                        col += (tex2D(_MainTex,uv).xyz*filter);
+                        count++;
                     }
                     
                 }
-            //col /= kernelSum;
 
-                //return float4(_filter[i.uv.x,i.uv.y],1);
-               // return _filter[x+1,y+1];
-            return float4(col,1.0f);
+                col = sqrt(col*col);
+            
+            return float4(col.xxx,1);
+            }
+
+
+            float4 fragGeneralFilter2(v2f i ): SV_Target {
+                
+                float3  col = float3(0.0f , 0.0f, 0.0f);
+                
+                
+                col = min(col,1);
+                //return float4(tex2D(_MainTex,i.uv).xyz,1);
+                return float4(col/9,1.0f);
             }
             ENDCG
         }
